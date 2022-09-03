@@ -1,51 +1,64 @@
 diff --git a/build.bash b/build.bash
-index 7c278b6..41494c5 100755
-with manual adjustments
+index 502d554..cba9811 100755
 --- a/build.bash
 +++ b/build.bash
-@@ -30,7 +30,6 @@ srcd="$(dirname $0)"
+@@ -33,9 +33,8 @@ test -n "${1-}" || die "usage: $0 build-directory"
+ outd=$1
+ srcd=$(dirname $0)
  mudir=$outd/mupdf
- muinc="-I $mudir/include -I $mudir/thirdparty/freetype/include"
+-muinc="-I $mudir/include -I $mudir/thirdparty/freetype/include"
  
--test -d "$mudir" || die muPDF not found, consult $(dirname $0)/BUILDING
+-test -d $mudir || die muPDF wasn\'t found in $outd/, consult $srcd/BUILDING
++mudeps=('freetype2' 'gumbo' 'harfbuzz' 'libjpeg' 'libopenjp2' 'x11' 'zlib')
  
  mkdir -p $outd/{$wsid,lablGL}
- :>$outd/ordered
-@@ -41,12 +40,6 @@ isfresh() { test -r "$1.past" && . "$1.past" && test "$k" = "$2"; }
- mulibst="$mudir/build/$mbt/libs"
- mulibs="$mudir/build/$mbt/libmupdf.a $mudir/build/$mbt/libmupdf-third.a"
  
--keycmd="(cd $mudir && make -q build=$mbt libs && echo); digest $mulibs"
--isfresh "$mulibst" "$(eval $keycmd)" || (
--    make -C "$mudir" build=$mbt -j $mjobs libs
--    eval $keycmd >${mulibst}.past
--) && vecho "fresh mupdf"
--
+@@ -45,8 +44,8 @@ mbt=${mbt:-release}
+ test -n "${gmk:-}" && gmk=false || gmk=true
+ 
+ mulibs="$mudir/build/$mbt/libmupdf.a $mudir/build/$mbt/libmupdf-third.a"
+-make="make -C "$mudir" build=$mbt -j $mjobs libs"
+-$make -q -s || $make
++# make="make -C "$mudir" build=$mbt -j $mjobs libs"
++# $make -q -s || $make
+ 
  oincs() {
-     local i=
-     local incs1=
-@@ -100,35 +93,6 @@ mflags() {
+     local b=$1 incs
+@@ -85,7 +84,7 @@ cflags() {
+         version.o) f=-DLLPP_VERSION=$ver;;
+         lablGL/*.o) f="-g -Wno-pointer-sign -Werror -O2";;
+         link.o)
+-            f="-g -std=c11 $muinc -Wall -Werror -Wextra -pedantic "
++	   f="$CFLAGS -g -std=c11 $(pkg-config --cflags -lfreetype -lgumbo -ljpeg -lopenjp2 -llcms2 -lharfbuzz -lz "${mudeps[@]}") -Wall -Werror -Wextra -pedantic "
+             test "${mbt-}" = "debug" || f+="-O2 "
+             $darwin && f+="-DMACOS -D_GNU_SOURCE -DGL_H='<OpenGL/gl.h>'" \
+                     || f+="-D_POSIX_C_SOURCE -DGL_H='<GL/gl.h>'"
+@@ -104,39 +103,6 @@ mflags() {
  }
  
- overs="$(ocamlc -vnum 2>/dev/null)" || overs=""
--test "$overs" = "4.11.1" || {
--    url=https://caml.inria.fr/pub/distrib/ocaml-4.11/ocaml-4.11.1.tar.xz
+ overs=$(ocamlc -vnum 2>/dev/null) || overs=""
+-if test "$overs" != "4.13.1"; then
+-    url=https://caml.inria.fr/pub/distrib/ocaml-4.13/ocaml-4.13.1.tar.xz
 -    txz=$outd/$(basename $url)
 -    keycmd="printf $url; digest $txz;"
 -    isfresh $txz "$(eval $keycmd)" || {
--        executable_p() { command -v "$1" >/dev/null 2>&1; }
--        if executable_p wget; then dl() { wget -q "$1" -O "$2"; }
+-        if executable_p wget; then dl() { wget "$1" -O "$2"; }
 -        elif executable_p curl; then dl() { curl -L "$1" -o "$2"; }
 -        else die "no program to fetch remote urls found"
 -        fi
 -        dl $url $txz
 -        eval $keycmd >$txz.past
 -    } && vecho "fresh $txz"
--    absprefix=$(cd $outd &>/dev/null; pwd -P)
+-    absprefix=$(realpath $outd)
 -    export PATH=$absprefix/bin:$PATH
 -    ocamlc=$absprefix/bin/ocamlc
 -    keycmd="printf $url; digest $ocamlc;"
 -    isfresh $ocamlc "$(eval $keycmd)" || (
+-        # This will needlessly re{configure,make} ocaml since "past"
+-        # of configure/make is hard to ascertain. "Better safe than
+-        # sorry" approach is taken here. The check will work for a
+-        # single ocaml url/version, but _will_ redo _everything_
+-        # otherwise (even if fully built artifacts are available)
 -        tar xf $txz -C $outd
 -        bn=$(basename $url)
 -        cd $outd/${bn%.tar.xz}
@@ -56,25 +69,33 @@ with manual adjustments
 -        eval $keycmd >$absprefix/bin/ocamlc.past
 -    ) && vecho "fresh ocamlc"
 -    overs=$(ocamlc -vnum 2>/dev/null)
--}
+-fi
  
- ccomp=${LLPP_CC-$(ocamlc -config | grep "^c_compiler: " | \
-                       { read _ c; echo $c; })}
-@@ -243,7 +208,7 @@ bobjc() {
-     } && vecho "fresh $o"
+ while read k v; do
+     case "$k" in
+@@ -218,6 +184,7 @@ baux() {
+ bocamlc() {
+     local o=$outd/$1 s=$srcd/${1%.o}.c cc=${CAML_CC:+-cc "'$CAML_CC'" }
+     baux $o "ocamlc $cc-ccopt \"$(cflags $o) -MMD -MF $o.dep -MT_\" -o $o -c $s"
++    # baux $o "ocamlc $cc-ccopt \"$(cflags $o) -MMD -MF $o.dep -MT_\" -c $s"
  }
  
--ver=$(cd $srcd && git describe --tags --dirty) || ver=unknown
+ bobjc() {
+@@ -225,7 +192,7 @@ bobjc() {
+     baux $o "$mcomp $(mflags $o) -MD -MF $o.dep -MT_ -c -o $o $srcd/${1%.o}.m"
+ }
+ 
+-ver=$(cd $srcd && git describe --tags --dirty) || ver="'built on $(date)'"
 +ver=@version@
  
- cmd="(. $srcd/genconfstr.sh >$outd/confstruct.ml)"
- keycmd="digest $srcd/genconfstr.sh $outd/confstruct.ml"
-@@ -291,7 +256,7 @@ for m in ml_gl ml_glarray ml_raw; do
+ gen=$srcd/genconfstruct.sh
+ out=$outd/confstruct.ml
+@@ -307,7 +274,7 @@ for m in ml_gl ml_glarray ml_raw; do
  done
  
  libs="str.cma unix.cma"
 -clibs="-L$mudir/build/$mbt -lmupdf -lmupdf-third -lpthread"
 +clibs="-lmupdf -lmupdf-third -lfreetype -lgumbo -ljpeg -lopenjp2 -ljbig2dec -llcms2 -lharfbuzz -lpthread -lz"
  if $darwin; then
-     mcomp=$(ocamlc -config | grep bytecomp_c_co | { read _ c; echo $c; })
-     clibs="$clibs -framework Cocoa -framework OpenGL"
+     mcomp=$ccomp
+     clibs+=" -framework Cocoa -framework OpenGL"
