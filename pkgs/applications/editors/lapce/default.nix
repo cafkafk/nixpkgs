@@ -4,8 +4,17 @@
 , rustPlatform
 , cmake
 , pkg-config
+, python3
 , perl
+, freetype
 , fontconfig
+, libxkbcommon
+, xcbutil
+, libX11
+, libXcursor
+, libXrandr
+, libXi
+, vulkan-loader
 , copyDesktopItems
 , makeDesktopItem
 , glib
@@ -21,20 +30,21 @@
 
 rustPlatform.buildRustPackage rec {
   pname = "lapce";
-  version = "0.1.2";
+  version = "0.2.0";
 
   src = fetchFromGitHub {
     owner = "lapce";
     repo = pname;
     rev = "v${version}";
-    sha256 = "sha256-jH473FdBI3rGt90L3WwMDPP8M3w0rtG5D758ceCMw94=";
+    sha256 = "sha256-cCcI5V6CMLkJM0miLv/o7LAJedrgb+z2CtWmF5/dmvY=";
   };
 
-  cargoSha256 = "sha256-0Kya2KcyBDlt0TpFV60VAA3+JPfwId/+k8k+H97EhB0=";
+  cargoSha256 = "sha256-H8vPBXJ0tom07wjzi18oIYNUhZXraD74DF7+xn8hfrQ=";
 
   nativeBuildInputs = [
     cmake
     pkg-config
+    python3
     perl
     copyDesktopItems
   ];
@@ -47,7 +57,15 @@ rustPlatform.buildRustPackage rec {
     gtk3
     openssl
   ] ++ lib.optionals stdenv.isLinux [
+    freetype
     fontconfig
+    libxkbcommon
+    xcbutil
+    libX11
+    libXcursor
+    libXrandr
+    libXi
+    vulkan-loader
   ] ++ lib.optionals stdenv.isDarwin [
     libobjc
     Security
@@ -56,6 +74,11 @@ rustPlatform.buildRustPackage rec {
     Carbon
     AppKit
   ];
+
+   # Add missing vulkan dependency to rpath
+￼  preFixup = lib.optionalString stdenv.isLinux ''
+￼    patchelf --add-needed ${vulkan-loader}/lib/libvulkan.so.1 $out/bin/lapce
+￼  '';
 
   postInstall = ''
     install -Dm0644 $src/extra/images/logo.svg $out/share/icons/hicolor/scalable/apps/lapce.svg
