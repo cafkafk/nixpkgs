@@ -1,15 +1,22 @@
-{lib, python3Packages, fetchFromGitHub, wl-clipboard, tesseract, qt4 }:
+{ lib
+, python3Packages
+, fetchFromGitHub
+, wl-clipboard
+, tesseract
+, python3
+, liblo
+#, qtbase
+#, qttools
+#, wrapQtAppsHook
+}:
 
+let
+  myPython = python3.withPackages (pkgs: with pkgs; [ pyqt5 liblo pyliblo pyxdg ]);
+in
 python3Packages.buildPythonApplication rec {
   pname = "normcap";
   version = "v0.3.11";
   format = "pyproject";
-
-
-  #src = fetchPypi {
-  #  inherit pname version;
-  #  hash = ""; # TODO
-  #};
 
   src = fetchFromGitHub {
     owner = "dynobo";
@@ -19,21 +26,27 @@ python3Packages.buildPythonApplication rec {
     sha256 = "sha256-bGfTaJ/jmjZ4c4/4Yzmh6xwysPsk8lx63xPp6VupX6M=";
   };
 
-  #preBuild = ''
-  #  cat >setup.py <<'EOF'
-  #  from setuptools import setup
-  #  setup(
-  #    name='normcap',
-  #    # ...
-  #  )
-  #  EOF
-  #'';
+  nativeBuildInputs = [ 
+    myPython
+    tesseract
+    #wrapQtAppsHook
+    #qttools
+    #qttools
+    wl-clipboard
+  ];
 
-  nativeBuildInputs = [ tesseract  ];
+  #buildInputs = [ 
+  #];
 
-  buildInputs = [ qt4 wl-clipboard ];
+  py = python3.override {
+    packageOverrides = self: super: {
+      pyqt5 = super.pyqt5.override {
+        withLocation = true;
+      };
+    };
+  };
 
-  propagatedBuildInputs = with python3Packages; [
+  pythonBuildInputs = with py.pkgs; [
     pytesseract
     poetry
     pyside
@@ -41,6 +54,11 @@ python3Packages.buildPythonApplication rec {
     pillow
     pysideShiboken
   ];
+
+  propagatedBuildInputs =  [
+    myPython
+    #qtbase
+  ] ++ pythonBuildInputs;
 
   # NOTE I assumed this is right because no tests exist
   #doCheck = false;
