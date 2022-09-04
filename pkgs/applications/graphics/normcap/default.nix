@@ -5,6 +5,9 @@
 , tesseract
 , python3
 , liblo
+, cmake
+, pysideApiextractor
+, qt4
 #, qtbase
 #, qttools
 #, wrapQtAppsHook
@@ -29,6 +32,7 @@ python3Packages.buildPythonApplication rec {
   nativeBuildInputs = [ 
     myPython
     tesseract
+    cmake
     #wrapQtAppsHook
     #qttools
     #qttools
@@ -57,8 +61,12 @@ python3Packages.buildPythonApplication rec {
 
   propagatedBuildInputs =  [
     myPython
+    pysideApiextractor
+    qt4
     #qtbase
   ] ++ pythonBuildInputs;
+
+  dontWrapQtApps = true;
 
   # NOTE I assumed this is right because no tests exist
   #doCheck = false;
