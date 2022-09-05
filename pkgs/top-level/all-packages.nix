@@ -2754,6 +2754,8 @@ with pkgs;
 
   goku = callPackage ../os-specific/darwin/goku { };
 
+  grb = callPackage ../applications/misc/grb { };
+
   kerf   = kerf_1; /* kerf2 is WIP */
   kerf_1 = callPackage ../development/interpreters/kerf {
     stdenv = clangStdenv;
@@ -2771,6 +2773,7 @@ with pkgs;
   };
 
   kjv = callPackage ../applications/misc/kjv { };
+
 
   luigi = callPackage ../applications/networking/cluster/luigi { };
 
